@@ -1,0 +1,84 @@
+version: "3.7"
+
+services:
+    # image php
+    php:
+        container_name: saas-php
+        build:
+            context: ./docker/php
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        tty: true
+        volumes:
+            - ./:/var/www
+            - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+        networks:
+            - saas
+
+
+    # nginx
+    nginx:
+        container_name: saas-nginx
+        build:
+            context: ./docker/nginx
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        tty: true
+        ports:
+            - '8080:80'
+            - '443:443'
+        volumes:
+            - ./:/var/www
+            - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+        networks:
+            - saas
+
+    # db mysql
+    db:
+        container_name: saas-mysql
+        image: mysql:5.7.22
+        platform: linux/x86_64
+        command: --default-authentication-plugin=mysql_native_password
+        restart: always
+        tty: true
+        volumes:
+            - saas-data:/var/lib/mysql/
+            - ./docker/mysql/my.cnf:/etc/mysql/my.cnf
+        networks:
+            - saas
+        ports:
+            - '3306:3306'
+        environment:
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_USER: ${DB_USERNAME}
+
+    phpmyadmin:
+        container_name: saas-phpmyadmin
+        image: phpmyadmin:5.2
+        restart: always
+        ports:
+            - '8888:80'
+        networks:
+            - saas
+        environment:
+            PMA_HOST: saas-mysql
+        depends_on:
+            - db
+
+    redis:
+        container_name: saas-redis
+        build:
+            context: ./docker/redis
+            dockerfile: Dockerfile
+        ports:
+        - '6379:6379'
+
+networks:
+    saas:
+        driver: bridge
+
+volumes:
+  saas-data:
+    driver: local
